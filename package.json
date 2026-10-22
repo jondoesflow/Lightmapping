@@ -1,0 +1,11 @@
+{
+  "name": "lightmapping",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Projection mapping studio that runs in your phone's browser",
+  "type": "module",
+  "scripts": {
+    "start": "npx --yes serve public -l 8080",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

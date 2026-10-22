@@ -1,67 +1,60 @@
 # Lightmapping
 
-A touch-first projection mapping and video mapping studio for iPhone and iPad, written in Swift, SwiftUI and Metal.
+A touch-first projection mapping and video mapping studio that runs in your phone's browser. Install it from Safari with **Add to Home Screen** and it opens full screen like an app. You don't need a Mac or the App Store.
 
-Map videos, photos, the live camera, hand drawings and generative visuals onto walls, windows, boxes and sculptures. Perform scenes live or arrange them on a timeline, then export the show or send it to a receiver device that loops it on its own.
+It's built the same way as Cheap Pumps (`fuelfinder`): a static `public/` folder with no build step, hosted on Netlify.
 
-This is a clean-room implementation built from a public feature description of a comparable App Store app. No code, assets or binaries from any other app were used.
+## Use it on iPhone
 
-## Build
+1. Deploy (below) and open the site in **Safari**.
+2. Tap **Share → Add to Home Screen**.
+3. Open Lightmapping from the home screen. Projects and media are saved on the device in IndexedDB.
 
-Requirements: Xcode 15 or later, iOS 17 or later, and a real device (Metal, camera and MIDI need hardware).
+## Deploy (Netlify, same as Cheap Pumps)
+
+- In Netlify, choose **Add new site → Import from Git**, pick this repo and keep the defaults. `netlify.toml` already sets `publish = "public"`, and there's no build command.
+- Or drag the `public/` folder onto app.netlify.com/drop.
+
+It must be served over HTTPS (Netlify does this), because camera, microphone, the service worker and installation all need it.
+
+## Run locally
 
 ```sh
-brew install xcodegen
-xcodegen generate
-open Lightmapping.xcodeproj
+npm start   # serves public/ on http://localhost:8080
+npm test    # unit tests for warping, modulation, timeline, presets
 ```
 
-Set your signing team on the `Lightmapping` target, then run it on your device. Run the unit tests with ⌘U.
+## Features
 
-## How features map to code
+| Feature | How it works here | Code |
+|---|---|---|
+| Squares, circles, text, cubes/boxes, hand-drawn outlines | Shapes rasterised to masks in surface space | `js/media.js` (`mask`), `js/stage.js` |
+| Drag corners on screen; bend edges around curves | A 2×2 corner pin uses a true perspective homography; 3×3 to 5×5 grids use a Catmull-Rom patch | `js/geometry.js` |
+| Masks, cutouts, soft edges | Cutouts are stored in surface UV space, so they follow re-mapping | `js/stage.js`, `SURFACE_FS` |
+| Image silhouettes | Tap the object in a photo. The MediaPipe interactive segmenter loads on first use, with a colour-key fallback offline | `js/vision.js` |
+| **Depth mode** (one photo becomes a depth-aware shape) | Silhouette plus a depth map from Depth Anything V2 (optional, about 30 MB the first time) or a distance-transform relief. Depth-aware visuals follow it | `js/vision.js`, `GENERATOR_FS` |
+| Multiple surfaces, layers, opacity, blend modes, ordering | Geometry belongs to the project; each scene assigns a layer stack per surface | `js/model.js`, `js/renderer.js` |
+| Visualizers, VJ loops, generative shaders, shape-aware animations | 26 GPU generators and 88 presets, **52 of them Halloween and Christmas** | `js/shaders.js`, `js/presets.js` |
+| Video, photos, live camera, animated hand drawings | WebGL textures from `<video>`, images, `getUserMedia` and a canvas | `js/media.js` |
+| Crop, fit, kaleidoscope, tile, slide, rotate, zoom, blur, monochrome, invert, colour cycle | One effects shader per layer | `LAYER_FS` |
+| Audio-reactive visuals | Web Audio FFT bands with auto-gain and onset detection, from the mic or the show's audio track | `js/audio.js` |
+| MIDI and MIDI learn | Web MIDI. Works in Chrome, Edge and on Android; **not in Safari on iPhone** | `js/audio.js` |
+| BPM-synced LFOs, envelopes, tap tempo, macros | Every slider has a modulation menu | `js/model.js`, `js/engine.js` |
+| Hand and face tracking | MediaPipe hand and face landmarks (pinch, hand position, face position, mouth open) | `js/vision.js` |
+| Scenes with live fade or dissolve; Perform pads | Two-scene render plus a transition shader | `js/engine.js` |
+| Timeline with audio track, trim, duplicate and automation | Clips of scenes; automation lanes drive macros | `js/panels.js` |
+| Export 720p, 1080p or 4K with audio | Real-time canvas recording (MediaRecorder). On iPhone the share sheet's **Save Video** puts it in Photos | `js/export.js` |
+| Export once, play without your phone | **Receiver mode** (`/receive.html`) on any device wired to the projector. Send it the show and it saves and loops it, even after a restart | `js/link.js`, `js/receive.js` |
+| HDMI / AirPlay output | Mirror the screen, then tap ⛶ for clean full-screen output. Or use **Live output** to a receiver so the controls stay on your phone | `js/app.js`, `js/link.js` |
+| Works offline | A service worker caches the app. Optional AI models and Link need a connection | `public/sw.js` |
 
-| Feature | Where |
-|---|---|
-| Squares, circles, text, cubes/boxes, image silhouettes, hand-drawn outlines | `Model/Project.swift` (`SurfaceShape`), `Rendering/MaskRenderer.swift`, `UI/MappingCanvas.swift` |
-| Drag corners on screen; bend edges around curved forms | `Geometry/WarpMesh.swift`: a 2×2 corner pin uses a true perspective homography; 3×3 to 5×5 grids use a Catmull-Rom patch |
-| Masks and cutouts | `Surface.cutouts`, drawn with the ✂︎ tool and stored in surface UV space, so they follow re-mapping. Soft edges come from `feather` |
-| Depth mode: one photo becomes a depth-aware shape | `Vision/ShapeExtractor.swift`: subject mask from Vision, depth from embedded Portrait/LiDAR data, a bundled Core ML model, or a synthetic relief. The `depthContours` and `depthScan` generators read it |
-| Several surfaces with different content | Geometry lives on `Project.surfaces`; each `MapScene` assigns a layer stack per surface |
-| Layers with independent opacity, blend and order | `Layer`, composited in `Renderer.renderScene` |
-| Visualizers, VJ loops, generative shaders, tunnels, neon, shape-aware animations | 26 generators in `Shaders.metal` and 88 presets in `Model/Presets.swift`, 52 of them for Halloween and Christmas |
-| Import videos and photos; live camera | `Sources/SourceManager.swift`, `Sources/CameraManager.swift` |
-| Draw and animate by hand | `UI/DrawingEditor.swift` and `Sources/DrawingRenderer.swift` (trace-on, pulse, hue cycle, flicker) |
-| Crop, fit, kaleidoscope, tile, slide, rotate, zoom, blur, monochrome, invert, color cycle | `layerFragment` in `Shaders.metal`, `LayerUniforms.apply` |
-| Audio reactivity | `Engine/AudioAnalyzer.swift`: FFT bands with auto-gain and onset detection |
-| MIDI control and MIDI learn | `Engine/MIDIManager.swift`. CCs drive parameters; notes from C1 upward switch scenes |
-| BPM-synced LFOs and envelopes; tap tempo | `Model/Modulation.swift`, `Engine.tapTempo()` |
-| Hand and face tracking | `CameraManager.runVision`: index-finger position, pinch, face position and mouth opening |
-| Scenes with live fade or dissolve transitions | `Engine.goToScene`, `transitionFragment` |
-| Timeline with audio track, trim, duplicate and automation | `UI/TimelineEditor.swift`. Automation lanes drive four macros, and any parameter can follow a macro |
-| Export in 720p, 1080p or 4K with audio | `Export/ShowExporter.swift`: deterministic offline render, then the audio is muxed in. Save to Photos or share |
-| Send to a receiver that loops without your phone | `Export/LinkTransfer.swift` (MultipeerConnectivity) and Receiver mode (`ReceiverView`) |
-| HDMI / AirPlay output with controls kept on device | `ExternalDisplaySceneDelegate` puts the clean output on the external screen |
-| Save projects | `Model/ProjectStore.swift` (JSON plus an asset folder in Documents, visible in the Files app) |
+## Differences from a native app
 
-## Architecture
+- **Second screen:** a web page can't drive a separate HDMI display. It mirrors, so use projector mode (⛶), or Live output to a receiver to keep the controls private.
+- **MIDI:** Safari on iPhone has no Web MIDI.
+- **Export:** recording runs in real time, so a 3-minute show takes 3 minutes. Keep the app in the foreground.
+- **Link:** connections are brokered by the free public PeerJS server. Video goes directly device to device over WebRTC when the network allows.
 
-```
-Project ──► Engine (CADisplayLink, @MainActor)
-             ├─ ModulationContext  ◄─ mic FFT · MIDI · LFO/envelopes · macros · Vision tracking · timeline
-             ├─ FrameState ──► Renderer (Metal)
-             │                  1. generators → per-layer textures (mask/depth aware)
-             │                  2. layer stack → per-surface content texture (effects, blend)
-             │                  3. warped mesh per surface → output texture (mask, feather)
-             │                  4. optional scene transition + alignment outlines
-             └─ presents the output texture to the device preview and the external display
-ShowExporter ──► its own Renderer + offline SourceManager ──► AVAssetWriter
-```
+## Native iOS version
 
-Rendering is the same code path live and in export. The exporter builds every modulation value from time, the timeline and pre-analysed audio, so an export looks the same every time.
-
-## Notes and limits
-
-- **Depth model:** to get learned monocular depth, add a Core ML depth model (for example Apple's Depth Anything V2 Small) to the target as `DepthModel.mlpackage`. Without it, depth comes from data embedded in the photo, or a relief estimated from the silhouette.
-- **Receiver:** the receiver is this same app in Receiver mode on another iOS or iPadOS device. Plug that device into the projector; it keeps looping after the sender disconnects.
-- **Camera in exports:** live camera layers show the last captured frame during export, because there is no live feed offline.
-- I wrote this in a Linux container without a Swift toolchain, so it has not yet been compiled. Expect a small round of compiler fixes on the first Xcode build.
+`native-ios/` has an earlier Swift/SwiftUI/Metal version of the same app. It needs a Mac with Xcode to build and has not been compiled. The web app above replaces it.

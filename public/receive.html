@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Lightmapping Receiver</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="receiver">
+  <video id="show" playsinline muted loop autoplay></video>
+  <div id="hud">
+    <div class="code-box">
+      <p>Receiver code</p>
+      <div id="code">····</div>
+      <p id="status">Connecting…</p>
+      <div class="buttons">
+        <button type="button" id="full" class="primary">⛶ Full screen</button>
+        <button type="button" id="unmute">🔊 Sound on</button>
+        <a class="button" href="/">Open editor</a>
+      </div>
+      <p class="hint">On your phone: Export &amp; Link → enter this code → Send show (saved here and looped) or Live output. Tap the screen to show or hide this panel.</p>
+    </div>
+  </div>
+  <script type="module" src="/js/receive.js"></script>
+</body>
+</html>
